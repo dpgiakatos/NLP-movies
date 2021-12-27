@@ -149,3 +149,8 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+glove.6B.300d.txt
+glove.6B.200d.txt
+glove.6B.100d.txt
+glove.6B.50d.txt
