@@ -1,109 +1,50 @@
-import pandas as pd
-import json
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
+from keras.preprocessing.text import Tokenizer
+from keras.preprocessing.text import one_hot
+from keras.preprocessing.sequence import pad_sequences
+# from keras.utils import to_categorical
+from model import Model
 from sklearn.model_selection import train_test_split
+import nltk
+import numpy as np
+from data_prepro import Dataset
 
+dataset = Dataset(punctuation=True, stop_words=True, tokenization=False)
+data = dataset.get_dataset()
+print(data.columns)
+texts = data['Overview'].tolist()  # define documents
+labels = np.array(data['Western'].tolist())
+# labels = array([1,1,1,1,1,0,0,0,0,0]) # define class labels
+print(labels)
 
-class Dataset:
-    def __init__(self, punctuation=False, stop_words=False, stem=False, tokenization=False):
-        self.data = pd.read_csv('data/tmdb_5000_movies.csv')[['genres', 'overview']]
-        self.data.dropna(subset=['overview'], inplace=True)
-        self.__clean()
-        self.__preprocess(punctuation, stop_words, stem, tokenization)
+tokenizer = Tokenizer()  # initialize tokenizer (embedding look up table technique)
+tokenizer.fit_on_texts(texts)  # transform each word using the lookup table technique (each word transforms into a unique number for each unique word)
+vocabulary_size = len(tokenizer.word_index) + 1  # setting in the vocabulary size hyperparameter
+sequences = tokenizer.texts_to_sequences(texts)  # transform into sequences
+train_data = pad_sequences(sequences, maxlen=1000)  # pad the sequences with zeros (creating same length data to pass)
+x_train, x_test, y_train, y_test = train_test_split(train_data, labels, test_size=0.3, random_state=42)  # split into training and testing set
 
-    def __clean(self):
-        data = {
-            'Overview': [],
-            'Western': [],
-            'Drama': [],
-            'Thriller': [],
-            'Mystery': [],
-            'Music': [],
-            'Romance': [],
-            'Action': [],
-            'Adventure': [],
-            'Foreign': [],
-            'Crime': [],
-            'Documentary': [],
-            'Horror': [],
-            'Fantasy': [],
-            'History': [],
-            'Science Fiction': [],
-            'Family': [],
-            'TV Movie': [],
-            'Comedy': [],
-            'Animation': [],
-            'War': []
-        }
-        for index, value in self.data.iterrows():
-            obj = json.loads(value['genres'])
-            if len(obj) == 0:
-                continue
-            data['Overview'].append(value['overview'])
-            genres = []
-            for genre in obj:
-                genres.append(genre['name'])
-            for key in data:
-                if key == 'Overview':
-                    continue
-                elif key in genres:
-                    data[key].append(1)
-                else:
-                    data[key].append(0)
-        self.data = pd.DataFrame(data)
+# y_train = to_categorical(y_train, 10)  # transform the labels into one hot encoded vectors (keras needs this for categorical crossentropy evaluation metric)
+# y_test = to_categorical(y_test, 10)
 
-    @staticmethod
-    def __punctuation(text):
-        punc = '''!()-[]{};:'"\,<>’./?@#$%^&*_~'''
-        for word in text:
-            if word in punc:
-                text = text.replace(word, '')
-        return text
+# load the whole embedding into memory
+embeddings_index = dict()
+f = open('glove.6B.100d.txt', encoding="utf8")
+for line in f:
+    values = line.split()
+    word = values[0]
+    coefs = np.asarray(values[1:], dtype='float32')
+    embeddings_index[word] = coefs
+f.close()
+print('Loaded %s word vectors.' % len(embeddings_index))
 
-    @staticmethod
-    def __stop_words(text):
-        stop_words = set(stopwords.words('english'))
-        new_text = []
-        for word in word_tokenize(text):
-            if word.lower() not in stop_words:
-                new_text.append(word)
-        return ' '.join(new_text)
+# create a weight matrix for words in training docs
+embedding_matrix = np.zeros((vocabulary_size, 100))
+for word, i in tokenizer.word_index.items():
+    embedding_vector = embeddings_index.get(word)
+    if embedding_vector is not None:
+        embedding_matrix[i] = embedding_vector
 
-    @staticmethod
-    def __stem(text):
-        ps = PorterStemmer()
-        new_test = []
-        for word in word_tokenize(text):
-            new_test.append(ps.stem(word))
-        return ' '.join(new_test)
-
-    @staticmethod
-    def __tokenization(text):
-        return word_tokenize(text)
-
-    def __preprocess(self, punctuation, stop_words, stem, tokenization):
-        if punctuation:
-            self.data['Overview'] = self.data['Overview'].apply(lambda row: Dataset.__punctuation(row))
-        if stop_words:
-            self.data['Overview'] = self.data['Overview'].apply(lambda row: Dataset.__stop_words(row))
-        if stem:
-            self.data['Overview'] = self.data['Overview'].apply(lambda row: Dataset.__stem(row))
-        if tokenization:
-            self.data['Overview'] = self.data['Overview'].apply(lambda row: Dataset.__tokenization(row))
-
-    def get_dataset(self):
-        return self.data
-
-    def train_test_split(self, test_size=0.2):
-        x_train, x_test, y_train, y_test = train_test_split(self.data[['Overview']], self.data[
-            ['Western', 'Drama', 'Thriller', 'Mystery', 'Music', 'Romance', 'Action', 'Adventure', 'Foreign', 'Crime',
-             'Documentary', 'Horror', 'Fantasy', 'History', 'Science Fiction', 'Family', 'TV Movie', 'Comedy',
-             'Animation', 'War']], test_size=test_size)
-        return x_train, x_test, y_train, y_test
-
-
-if __name__ == '__main__':
-    dataset = Dataset(punctuation=True, stop_words=True, tokenization=True)
-    x_train, x_test, y_train, y_test = dataset.train_test_split()
+model = Model()  # initialize the model
+model.create_model(vocabulary_size, embedding_matrix)  # create the model
+model.train(x_train, y_train, x_test, y_test)  # train the model with our data
+model.test(x_test, y_test)  # evaluate the trained model using the test set
