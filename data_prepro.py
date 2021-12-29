@@ -11,8 +11,8 @@ from keras.preprocessing.sequence import pad_sequences
 
 class Dataset:
     def __init__(self, punctuation=False, stop_words=False, stem=False, embedding=False):
-        self.vocabulary_size = None
-        self.embedding_dict = None
+        self.embeddings_index = None
+        self.length_long_sentence = -1
         self.data = pd.read_csv('data/tmdb_5000_movies.csv')[['genres', 'overview']]
         self.data.dropna(inplace=True)
         self.__clean()
@@ -85,27 +85,16 @@ class Dataset:
         return ' '.join(new_test)
 
     def __glove(self):
-        tokenizer = Tokenizer()  # initialize tokenizer (embedding look up table technique)
-        tokenizer.fit_on_texts(self.data['Overview'].tolist())  # transform each word using the lookup table technique (each word transforms into a unique number for each unique word)
-        self.vocabulary_size = len(tokenizer.word_index) + 1  # setting in the vocabulary size hyperparameter
         # load the whole embedding into memory
-        embeddings_index = dict()
+        self.embeddings_index = dict()
         f = open('glove.6B.100d.txt', encoding="utf8")
         for line in f:
             values = line.split()
             word = values[0]
             coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
+            self.embeddings_index[word] = coefs
         f.close()
-        print(f'Loaded {len(embeddings_index)} word vectors.')
-        # create a weight matrix for words in training docs
-        # embedding_matrix = np.zeros((self.vocabulary_size, 100))
-        self.embedding_dict = dict()
-        for word, i in tokenizer.word_index.items():
-            embedding_vector = embeddings_index.get(word)
-            if embedding_vector is not None:
-                # embedding_matrix[i] = embedding_vector
-                self.embedding_dict[word] = embedding_vector
+        print(f'Loaded {len(self.embeddings_index)} word vectors.')
 
     def __embedding(self, text):
         doc = []
@@ -113,10 +102,17 @@ class Dataset:
             print('empty')
             exit(0)
         for word in word_tokenize(text):
-            if word.lower() in self.embedding_dict:
-                doc.append(self.embedding_dict[word.lower()])
-        # print(np.array(doc).mean(axis=0).shape)
-        return np.array(doc).mean(axis=0)  # return the mean of text glove. maybe we should concat instead of mean!
+            if word.lower() in self.embeddings_index:
+                doc.append(self.embeddings_index[word.lower()])
+        if len(doc) > self.length_long_sentence:
+            self.length_long_sentence = len(doc)
+        return doc
+
+    def __pad_sequences(self, embedded):
+        zeros = np.zeros(100)
+        for _ in range(len(embedded), self.length_long_sentence):
+            embedded.append(zeros)
+        return np.array(embedded)
 
     def __preprocess(self, punctuation, stop_words, stem, embedding):
         if punctuation:
@@ -129,6 +125,7 @@ class Dataset:
         if embedding:
             self.__glove()
             self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__embedding(row))
+            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__pad_sequences(row))
 
     def get_dataset(self):
         return self.data

@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Dense, SimpleRNN, Flatten, MaxPooling1D, Dropout
+from keras.layers import Dense, SimpleRNN, Flatten, Input, Reshape, MaxPooling1D, Dropout
 from keras.layers.embeddings import Embedding
 from sklearn.svm import SVC
 from sklearn.linear_model import SGDClassifier
@@ -9,7 +9,7 @@ from sklearn.metrics import log_loss, accuracy_score
 
 
 class Model:
-    def __init__(self, model_type, feature_dim, vocabulary_size=None, embedding_matrix=None):
+    def __init__(self, model_type, input_shape, vocabulary_size=None, embedding_matrix=None):
         self.models = {
             'Western': None,
             'Drama': None,
@@ -32,7 +32,7 @@ class Model:
             'Animation': None,
             'War': None
         }
-        self.feature_dim = feature_dim
+        self.input_shape = input_shape
         self.model_type = model_type
         self.vocabulary_size = vocabulary_size
         self.embedding_matrix = embedding_matrix
@@ -56,11 +56,17 @@ class Model:
 
     def __create_rnn(self):
         model = Sequential()
-        model.add(SimpleRNN(1000, input_shape=(self.feature_dim, 1)))
+        model.add(Input(shape=self.input_shape))
+        model.add(Flatten())
+        # to add timesteps dim so the output will be (batch_size, timesteps, input_dim)
+        model.add(Reshape((1, self.input_shape[0]*self.input_shape[1]), input_shape=(self.input_shape[0]*self.input_shape[1],)))
+        model.add(SimpleRNN(1000))
         model.add(Dense(1, activation='sigmoid'))
         opt = tf.keras.optimizers.Adam(learning_rate=0.03)
         model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
         model.summary()
+        # for layer in model.layers:
+        #     print(layer.input_shape)
         return model
 
     def __create_model(self):
@@ -83,16 +89,13 @@ class Model:
         # model.compile(loss='sparse_categorical_crossentropy', optimizer=adam_optimizer, metrics=['accuracy'])
         return model
 
-    def train(self, train_x, train_y, test_x=None, test_y=None, epochs=30, batch_size=30):
+    def train(self, train_x, train_y, validate_x=None, validate_y=None, epochs=30, batch_size=30):
         train_x = np.array(train_x.iloc[:, 0].values.tolist())
-        if self.model_type == 'model':
-            for key in self.models:
-                self.models[key].fit(train_x, train_y[key].to_numpy(), epochs=epochs, batch_size=batch_size,
-                    validation_data=(test_x, test_y))  # fit method to train our neural network with the passed in data
-        elif self.model_type == 'rnn':
+        if self.model_type in 'model|rnn':
             for key in self.models:
                 self.models[key].fit(train_x, train_y[key].to_numpy(), epochs=epochs, batch_size=batch_size)
         else:
+            train_x = train_x.reshape(train_x.shape[0], train_x.shape[1]*train_x.shape[2])
             for key in self.models:
                 self.models[key].fit(train_x, train_y[key].to_numpy())
 
@@ -105,7 +108,7 @@ class Model:
             'score': dict()
         }
         test_x = np.array(test_x.iloc[:, 0].values.tolist())
-        if self.model_type == 'model':
+        if self.model_type in 'model|rnn':
             for key in self.models:
                 score = self.models[key].evaluate(test_x, test_y[key].to_numpy())
                 if key not in res['score']:
@@ -113,6 +116,7 @@ class Model:
                 res['score'][key]['loss'] = score[0]
                 res['score'][key]['accuracy'] = score[1]
         else:
+            test_x = test_x.reshape(test_x.shape[0], test_x.shape[1]*test_x.shape[2])
             for key in self.models:
                 pred_y = self.models[key].predict(test_x)
                 if key not in res['score']:

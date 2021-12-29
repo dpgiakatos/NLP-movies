@@ -12,9 +12,10 @@ data = dataset.get_dataset()
 
 x_train, x_test, y_train, y_test = dataset.train_test_split(0.3)
 
-# data_list = np.array(x_train.iloc[:, 0].values.tolist())
+data_list = np.array(x_train.iloc[:, 0].values.tolist())
+print(data_list.shape)
 
-model = Model('rnn', feature_dim=100)  # initialize the model
+model = Model('rnn', input_shape=(data_list.shape[1], data_list.shape[2]))  # initialize the model
 model.train(x_train, y_train, x_test, y_test, epochs=2)  # train the model with our data
 res = model.test(x_test, y_test)  # evaluate the trained model using the test set
 print(res)
