@@ -23,4 +23,4 @@ model = Model('bilstm', input_shape=(data_list.shape[1], data_list.shape[2]))  #
 model.train(x_train, y_train, epochs=2)  # Training the model with our train data, epochs is the same in the training
 # of each model fo each genre
 res = model.test(x_test, y_test)  # Evaluate the trained model using the test set
-pprint(res)  # Printing the results
+print(res)  # Printing the results
