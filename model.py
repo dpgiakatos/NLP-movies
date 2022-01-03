@@ -39,16 +39,16 @@ class Model:
 
     def __init_model(self):
         # Choosing the model and creating a model for each Genre
-        if self.model_type == 'svm-linear':
-            model = LinearSVC(random_state=42)
-        elif self.model_type == 'svm-rbf':
-            model = SVC(kernel='rbf', random_state=42)
-        elif self.model_type == 'linear':
+        if self.model_type == 'linear':
             model = SGDClassifier(random_state=42)
         elif self.model_type == 'tree':
             model = DecisionTreeClassifier(random_state=42)
         elif self.model_type == 'forest':
             model = RandomForestClassifier(n_estimators=10, random_state=42)
+        elif self.model_type == 'svm-linear':
+            model = LinearSVC(random_state=42)
+        elif self.model_type == 'svm-rbf':
+            model = SVC(kernel='rbf', random_state=42)
         elif self.model_type == 'mlp':
             model = self.__create_mlp()
         elif self.model_type == 'rnn':
