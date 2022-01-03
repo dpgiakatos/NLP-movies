@@ -5,12 +5,11 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 from sklearn.model_selection import train_test_split
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
 
 
 class Dataset:
     def __init__(self, punctuation=False, stop_words=False, stem=False, embedding=False):
+        # Dataset class used for the pre-processing phase
         self.embeddings_index = None
         self.length_long_sentence = -1
         self.data = pd.read_csv('data/tmdb_5000_movies.csv')[['genres', 'overview']]
@@ -61,7 +60,8 @@ class Dataset:
 
     @staticmethod
     def __punctuation(text):
-        punc = '''!()-[]{};:'"\,<>’./?@#$%^&*_~'''
+        #  Removing all the punctuation from the overviews
+        punc = '''!(+)-[|]{};:'"\,<=>’./?@#$%^&*_~'''
         for word in text:
             if word in punc:
                 text = text.replace(word, '')
@@ -69,6 +69,7 @@ class Dataset:
 
     @staticmethod
     def __stop_words(text):
+        #  Removing all the stopwords from the overviews
         stop_words = set(stopwords.words('english'))
         new_text = []
         for word in word_tokenize(text):
@@ -78,6 +79,7 @@ class Dataset:
 
     @staticmethod
     def __stem(text):
+        # Using PorterStemmer to apply stemming to the overviews
         ps = PorterStemmer()
         new_test = []
         for word in word_tokenize(text):
@@ -85,7 +87,8 @@ class Dataset:
         return ' '.join(new_test)
 
     def __glove(self):
-        # load the whole embedding into memory
+        # Loading the whole embedding into memory and creating a dictionary where the keys are the words of the
+        # overviews and the values are the embeddings
         self.embeddings_index = dict()
         f = open('glove.6B.100d.txt', encoding="utf8")
         for line in f:
@@ -97,6 +100,7 @@ class Dataset:
         print(f'Loaded {len(self.embeddings_index)} word vectors.')
 
     def __embedding(self, text):
+        # Replacing each overview with a list of word embeddings
         doc = []
         if len(text) == 0:
             print('empty')
@@ -109,12 +113,14 @@ class Dataset:
         return doc
 
     def __pad_sequences(self, embedded):
+        # Filling the sentences with zero embeddings in order to have same sentences length
         zeros = np.zeros(100)
         for _ in range(len(embedded), self.length_long_sentence):
             embedded.append(zeros)
         return np.array(embedded)
 
     def __preprocess(self, punctuation, stop_words, stem, embedding):
+        # Secret function to apply the pre-processing functions based on the initialization of the dataset class
         if punctuation:
             self.data['Overview'] = self.data['Overview'].apply(lambda row: Dataset.__punctuation(row))
         if stop_words:
@@ -128,9 +134,11 @@ class Dataset:
             self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__pad_sequences(row))
 
     def get_dataset(self):
+        # Returns the data of the dataset class after the manipulation
         return self.data
 
     def train_test_split(self, test_size=0.2):
+        # Splits the pre-processed data of the dataset into train set and test set.
         x_train, x_test, y_train, y_test = train_test_split(self.data[['Overview']], self.data[
             ['Western', 'Drama', 'Thriller', 'Mystery', 'Music', 'Romance', 'Action', 'Adventure', 'Foreign', 'Crime',
              'Documentary', 'Horror', 'Fantasy', 'History', 'Science Fiction', 'Family', 'TV Movie', 'Comedy',
