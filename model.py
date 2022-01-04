@@ -6,7 +6,7 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import log_loss, accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 
 class Model:
@@ -123,8 +123,10 @@ class Model:
         # Evaluation function, which returns a dictionary as shown bellow:
         # {
         #   (genre): {
-        #       'loss': (value),
-        #       'accuracy': (value)
+        #       'accuracy': (value),
+        #       'precision': (value)
+        #       'recall': (value)
+        #       'f1': (value)
         #   }
         # }
         res = {
@@ -132,19 +134,20 @@ class Model:
             'score': dict()
         }
         test_x = np.array(test_x.iloc[:, 0].values.tolist())
-        if self.model_type in 'mlp|rnn|lstm|bilstm':
-            for key in self.models:
-                score = self.models[key].evaluate(test_x, test_y[key].to_numpy())
-                if key not in res['score']:
-                    res['score'][key] = dict()
-                res['score'][key]['loss'] = score[0]
-                res['score'][key]['accuracy'] = score[1]
-        else:
+        if self.model_type not in 'mlp|rnn|lstm|bilstm':
             test_x = test_x.reshape(test_x.shape[0], test_x.shape[1] * test_x.shape[2])
-            for key in self.models:
+        for key in self.models:
+            if self.model_type not in 'mlp|rnn|lstm|bilstm':
                 pred_y = self.models[key].predict(test_x)
-                if key not in res['score']:
-                    res['score'][key] = dict()
-                res['score'][key]['loss'] = log_loss(test_y[key].to_numpy(), pred_y)
-                res['score'][key]['accuracy'] = accuracy_score(test_y[key].to_numpy(), pred_y)
+            else:
+                pred_y = np.where(self.models[key].predict(test_x) > 0.5, 1, 0).flatten()
+                # print(pred_y.flatten())
+                # print(test_y[key].to_numpy())
+                # exit(0)
+            if key not in res['score']:
+                res['score'][key] = dict()
+            res['score'][key]['accuracy'] = accuracy_score(test_y[key].to_numpy(), pred_y)
+            res['score'][key]['precision'] = precision_score(test_y[key].to_numpy(), pred_y)
+            res['score'][key]['recall'] = recall_score(test_y[key].to_numpy(), pred_y)
+            res['score'][key]['f1'] = f1_score(test_y[key].to_numpy(), pred_y)
         return res

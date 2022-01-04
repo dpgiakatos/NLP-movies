@@ -19,10 +19,10 @@ print(data_list.shape)  # 3339: overviews, 103: overviews words length, 100: wor
 # 'rnn'   : Recurrent Neural Network
 # 'lstm'  : Long Short Term Memory
 # 'bilstm': Bidirectional Long Short Term Memory
-model = Model('lstm', input_shape=(data_list.shape[1], data_list.shape[2]))  # Initialization of the Model, choose one
+model = Model('rnn', input_shape=(data_list.shape[1], data_list.shape[2]))  # Initialization of the Model, choose one
 # from the above models. The input_shape is a mandatory parameter, and actually it represents the length of words in
 # the overviews and the length of the word embeddings
-model.train(x_train, y_train, epochs=2)  # Training the model with our train data, epochs is the same in the training
+model.train(x_train, y_train, epochs=1)  # Training the model with our train data, epochs is the same in the training
 # of each model fo each genre
 res = model.test(x_test, y_test)  # Evaluate the trained model using the test set
 print(res)  # Printing the results
