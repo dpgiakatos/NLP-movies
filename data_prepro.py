@@ -5,10 +5,14 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 from sklearn.model_selection import train_test_split
+import fasttext
+import os
+from gensim.models import Word2Vec
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 class Dataset:
-    def __init__(self, punctuation=False, stop_words=False, stem=False, embedding=False):
+    def __init__(self, punctuation=False, stop_words=False, stem=False, embedding='glove'):
         # Dataset class used for the pre-processing phase
         self.embeddings_index = None
         self.length_long_sentence = -1
@@ -99,15 +103,41 @@ class Dataset:
         f.close()
         print(f'Loaded {len(self.embeddings_index)} word vectors.')
 
-    def __embedding(self, text):
+    def __fasttext(self):
+        # Get word embedding using fasttext
+        self.data['Overview'].to_csv('temp_text.txt', header=None, index=None, mode='a')
+        self.embeddings_model = fasttext.train_unsupervised('temp_text.txt', model='skipgram')
+        os.remove('temp_text.txt')
+
+    def __word2vec(self):
+        # Get word embedding using word2vec
+        sentences = []
+        for i in self.data['Overview'].to_list():
+            sentences.append(i.split(' '))
+        self.embeddings_model = Word2Vec(sentences)
+
+    def __tfidf(self):
+        # Get word embedding using tfidf
+        self.embeddings_model = TfidfVectorizer()
+        self.embeddings_model.fit(self.data['Overview'].to_list())
+
+    def __embedding(self, text, method='glove'):
         # Replacing each overview with a list of word embeddings
         doc = []
         if len(text) == 0:
             print('empty')
             exit(0)
         for word in word_tokenize(text):
-            if word.lower() in self.embeddings_index:
-                doc.append(self.embeddings_index[word.lower()])
+            if method == 'glove':
+                if word.lower() in self.embeddings_index:
+                    doc.append(self.embeddings_index[word.lower()])
+            elif method == 'fasttext':
+                doc.append(self.embeddings_model.get_word_vector(word.lower()))
+            elif method == 'word2vec':
+                try:
+                    doc.append(self.embeddings_model.wv[word.lower()])
+                except:
+                    pass
         if len(doc) > self.length_long_sentence:
             self.length_long_sentence = len(doc)
         return doc
@@ -119,6 +149,18 @@ class Dataset:
             embedded.append(zeros)
         return np.array(embedded)
 
+    def __vectorize(self, embedding):
+        # Create a 3D array from vectorize methods, like tfidf, to have the same input format as dense vectorize methods
+        if embedding == 'tfidf':
+            vectors = self.embeddings_model.transform(self.data['Overview'].to_list()).toarray().tolist()
+        doc = []
+        for vector in vectors:
+            temp = []
+            for ell in vector:
+                temp.append([ell])
+            doc.append(temp)
+        return doc
+
     def __preprocess(self, punctuation, stop_words, stem, embedding):
         # Secret function to apply the pre-processing functions based on the initialization of the dataset class
         if punctuation:
@@ -128,10 +170,21 @@ class Dataset:
             self.data.dropna(inplace=True)
         if stem:
             self.data['Overview'] = self.data['Overview'].apply(lambda row: Dataset.__stem(row))
-        if embedding:
+        if embedding == 'glove':
             self.__glove()
-            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__embedding(row))
+            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__embedding(row, embedding))
             self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__pad_sequences(row))
+        elif embedding == 'fasttext':
+            self.__fasttext()
+            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__embedding(row, embedding))
+            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__pad_sequences(row))
+        elif embedding == 'word2vec':
+            self.__word2vec()
+            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__embedding(row, embedding))
+            self.data['Overview'] = self.data['Overview'].apply(lambda row: self.__pad_sequences(row))
+        elif embedding == 'tfidf':
+            self.__tfidf()
+            self.data['Overview'] = self.__vectorize(embedding)
 
     def get_dataset(self):
         # Returns the data of the dataset class after the manipulation

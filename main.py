@@ -1,9 +1,13 @@
 from model import Model
 from data_prepro import Dataset
 import numpy as np
-from pprint import pprint
 
-dataset = Dataset(punctuation=True, stop_words=True, embedding=True)  # Initialization the Dataset class
+
+# 'glove'    : Glove embedding
+# 'fasttext' : FastText embedding
+# 'word2vec' : Word2Vec embedding
+# 'tfidf'    : Tf-Idf embedding
+dataset = Dataset(punctuation=True, stop_words=True, embedding='glove')  # Initialization the Dataset class
 x_train, x_test, y_train, y_test = dataset.train_test_split(0.3)  # Splitting the dataset into train, test set
 
 data_list = np.array(x_train.iloc[:, 0].values.tolist())  # Getting all the overviews as lists of word embeddings
@@ -19,7 +23,9 @@ print(data_list.shape)  # 3339: overviews, 103: overviews words length, 100: wor
 # 'rnn'   : Recurrent Neural Network
 # 'lstm'  : Long Short Term Memory
 # 'bilstm': Bidirectional Long Short Term Memory
-model = Model('rnn', input_shape=(data_list.shape[1], data_list.shape[2]))  # Initialization of the Model, choose one
+# 'multinomial': Multinomial Naive Bayes
+# 'bernoulli': Bernoulli Naive Bayes
+model = Model('linear', input_shape=(data_list.shape[1], data_list.shape[2]))  # Initialization of the Model, choose one
 # from the above models. The input_shape is a mandatory parameter, and actually it represents the length of words in
 # the overviews and the length of the word embeddings
 model.train(x_train, y_train, epochs=1)  # Training the model with our train data, epochs is the same in the training

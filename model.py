@@ -7,6 +7,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 
 
 class Model:
@@ -57,6 +58,10 @@ class Model:
             model = self.__create_model(self.model_type)
         elif self.model_type == 'bilstm':
             model = self.__create_model(self.model_type)
+        elif self.model_type == 'multinomial':
+            model = MultinomialNB()
+        elif self.model_type == 'bernoulli':
+            model = BernoulliNB()
         else:
             raise f'{self.model_type} does not exist'
         for key in self.models:
@@ -75,7 +80,7 @@ class Model:
         model.add(Dropout(0.4))
         model.add(Dense(1, activation='sigmoid'))
         opt = tf.keras.optimizers.Adam(learning_rate=0.03)
-        model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+        model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['Accuracy', 'Precision', 'Recall'])
         model.summary()
         return model
 
@@ -99,7 +104,7 @@ class Model:
             model.add(LSTM(1000, return_sequences=True))
             model.add(TimeDistributed(Dense(1, activation='sigmoid')))
         opt = tf.keras.optimizers.Adam(learning_rate=0.03)
-        model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+        model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['Accuracy', 'Precision', 'Recall'])
         model.summary()
         return model
 
@@ -139,15 +144,18 @@ class Model:
         for key in self.models:
             if self.model_type not in 'mlp|rnn|lstm|bilstm':
                 pred_y = self.models[key].predict(test_x)
+                if key not in res['score']:
+                    res['score'][key] = dict()
+                res['score'][key]['accuracy'] = accuracy_score(test_y[key].to_numpy(), pred_y)
+                res['score'][key]['precision'] = precision_score(test_y[key].to_numpy(), pred_y)
+                res['score'][key]['recall'] = recall_score(test_y[key].to_numpy(), pred_y)
+                res['score'][key]['f1'] = f1_score(test_y[key].to_numpy(), pred_y)
             else:
-                pred_y = np.where(self.models[key].predict(test_x) > 0.5, 1, 0).flatten()
-                # print(pred_y.flatten())
-                # print(test_y[key].to_numpy())
-                # exit(0)
-            if key not in res['score']:
-                res['score'][key] = dict()
-            res['score'][key]['accuracy'] = accuracy_score(test_y[key].to_numpy(), pred_y)
-            res['score'][key]['precision'] = precision_score(test_y[key].to_numpy(), pred_y)
-            res['score'][key]['recall'] = recall_score(test_y[key].to_numpy(), pred_y)
-            res['score'][key]['f1'] = f1_score(test_y[key].to_numpy(), pred_y)
+                _, acc, pre, re = self.models[key].evaluate(test_x, test_y[key].to_numpy())
+                if key not in res['score']:
+                    res['score'][key] = dict()
+                res['score'][key]['accuracy'] = acc
+                res['score'][key]['precision'] = pre
+                res['score'][key]['recall'] = re
+                res['score'][key]['f1'] = 2 * (pre * re) / (pre + rec) if pre != 0 and re != 0 else 0
         return res
